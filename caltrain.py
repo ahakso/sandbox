@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import pdb
 import re
 from datetime import timezone
 
@@ -38,6 +39,7 @@ MAP_TO_AVAILABLE_STATION = {
     "22nd Street Caltrain Station": "22nd Street Caltrain Station",
     "San Francisco Caltrain Station": "22nd Street Caltrain Station",
     "Redwood City Caltrain Station": "Redwood City Caltrain Station",
+    "San Francisco Caltrain Station": "San Francisco Caltrain Station",
 }
 
 
@@ -71,26 +73,49 @@ class RwcSfTrains:
         self._trains_with_destination_stop = self.departures_response_to_next_trains_stopping_at_station(self.my_destination_station_id)
 
     def next_train_options(self):
+        departure_df = self.departures_response_to_next_trains_stopping_at_station(self.my_departure_station_id).rename(
+            columns={
+                "stop_name": "departure_stop",
+                "time_late": "late_departing",
+            }
+        )
+        arrival_df = self.departures_response_to_next_trains_stopping_at_station(self.my_destination_station_id).rename(
+            columns={
+                "stop_name": "arrival_stop",
+                "time_late": "late_arriving",
+                "scheduled_departure": "scheduled_arrival",
+            }
+        )
+        if self.my_destination_station_id == "san_francisco" and not len(arrival_df):
+            arrival_df = self.estimate_sf_stop_from_22nd_st_stop(self.departures_response_to_next_trains_stopping_at_station("22nd_street"), include_22nd=False).rename(
+                columns={
+                    "stop_name": "arrival_stop",
+                    "time_late": "late_arriving",
+                    "scheduled_departure": "scheduled_arrival",
+                }
+            )
+
         return (
             pd.merge(
-                self.departures_response_to_next_trains_stopping_at_station(self.my_departure_station_id).rename(
-                    columns={
-                        "stop_name": "departure_stop",
-                        "time_late": "late_departing",
-                    }
-                ),
-                self.departures_response_to_next_trains_stopping_at_station(self.my_destination_station_id).rename(
-                    columns={
-                        "stop_name": "arrival_stop",
-                        "time_late": "late_arriving",
-                        "scheduled_departure": "scheduled_arrival",
-                    }
-                ),
+                departure_df,
+                arrival_df,
                 on="vehicle_id",
             )
             .loc[:, lambda df: [x for x in df.columns if "expected" not in x]]
-            .assign(travel_time=lambda df: df.scheduled_arrival - df.scheduled_departure)[
-                ["departure_stop", "arrival_stop", "scheduled_departure", "late_departing", "scheduled_arrival", "late_arriving", "travel_time"]
+            .assign(
+                scheduled_departure=lambda df: pd.to_datetime(df.scheduled_departure),
+                scheduled_arrival=lambda df: pd.to_datetime(df.scheduled_arrival),
+                travel_time=lambda df: df.scheduled_arrival - df.scheduled_departure,
+            )[
+                [
+                    "departure_stop",
+                    "arrival_stop",
+                    "scheduled_departure",
+                    "late_departing",
+                    "scheduled_arrival",
+                    "late_arriving",
+                    "travel_time",
+                ]
             ]
             .pipe(format_for_display)
         )
@@ -122,26 +147,40 @@ class RwcSfTrains:
         self.real_time_response = self.request_to_dict(f"http://api.511.org/transit/VehicleMonitoring?api_key={self.api_key}&agency={CALTRAIN_OPERATOR_ID}")
         return self
 
-    def all_rwc_train_stops(self):
+    def all_rwc_trains_and_onward_stops(self):
         if self.departures_response is None:
             self.fetch_data()
-        missing_train_ids = [x for x in self.trains_with_departure_stop.vehicle_id if x not in self.get_vehicle_onward_stops().vehicle_id.values]
+        missing_train_ids = set([x for x in self.trains_with_departure_stop.vehicle_id if x not in self.get_vehicle_onward_stops().vehicle_id.values])
         if missing_train_ids:
-            print(f"trains {missing_train_ids} not in the realtime response :thunk:")
+            print(f"train{'s' if len(missing_train_ids) >1 else ''} {missing_train_ids} not in the realtime response :thunk:")
         return (
-            self.trains_with_departure_stop.merge(self.get_vehicle_onward_stops(), on="vehicle_id", how="left")
+            self.trains_with_departure_stop.merge(
+                self.get_vehicle_onward_stops().rename(
+                    columns={
+                        "expected_departure": "expected_departure_onward_stop",
+                        "scheduled_departure": "scheduled_departure_onward_stop",
+                        "stop_name": "stop_name_onward_stop",
+                    }
+                ),
+                on="vehicle_id",
+                how="left",
+            )
             .drop(columns=["vehicle_id"])
-            .assign(trip_duration_from_rwc=lambda df: (df.expected_departure - df.expected_rwc_departure) if "expected_departure" in df.columns else (df.expected_arrival - df.expected_rwc_arrival))
+            .assign(
+                trip_duration_from_origin=lambda df: (df.expected_departure_onward_stop - df.expected_departure)
+                if "expected_departure" in df.columns
+                else (df.expected_arrival_onward_stop - df.expected_arrival)
+            )
             .pipe(format_for_display)
         )
 
     def get_next_sf_trips_from_rwc(self):
         return (
-            self.all_rwc_train_stops()
+            self.all_rwc_trains_and_onward_stops()
             .data.loc[
-                lambda df: df["stop name"].apply(lambda x: x in ["4th & King", np.nan])
+                lambda df: df["stop name onward stop"].apply(lambda x: x in ["San Francisco Caltrain Station", np.nan])
                 if self.direction == "north"
-                else df["stop name"].apply(lambda x: x in ["Redwood City Caltrain Station", np.nan]),
+                else df["stop name onward stop"].apply(lambda x: x in ["Redwood City Caltrain Station", np.nan]),
                 :,
             ]
             .pipe(format_for_display)
@@ -153,20 +192,18 @@ class RwcSfTrains:
         response.encoding = "utf-8-sig"
         return response.json()
 
-    def filter_predicted_stops_to_station(self, trains, stop_name: str) -> pd.DataFrame:
+    def convert_predicted_stops_json_to_df(self, trains, stop_name: str) -> pd.DataFrame:
         predicted_stops = convert_time_str_to_local_tz_timestamp(
             replace_colnames(
-                pd.DataFrame([x["MonitoredVehicleJourney"]["MonitoredCall"] | {"VehicleRef": x["MonitoredVehicleJourney"]["FramedVehicleJourneyRef"]["DatedVehicleJourneyRef"]} for x in trains]).loc[
-                    lambda df: df.StopPointName == MAP_TO_AVAILABLE_STATION[stop_name]
-                ]
+                pd.DataFrame([x["MonitoredVehicleJourney"]["MonitoredCall"] | {"VehicleRef": x["MonitoredVehicleJourney"]["FramedVehicleJourneyRef"]["DatedVehicleJourneyRef"]} for x in trains])
             ),
             MY_TRAIN_TIME_COLS,
         )
-        if stop_name == "San Francisco Caltrain Station":
-            predicted_stops = self.estimate_sf_stop_from_22nd_st_stop(predicted_stops).loc[lambda df: df.stop_name == "4th & King"]
+        if stop_name == ("San Francisco Caltrain Station") and not predicted_stops.stop_name.str.contains("San Francisco Caltrain Station").any():
+            predicted_stops = self.estimate_sf_stop_from_22nd_st_stop(predicted_stops).loc[lambda df: df.stop_name == "San Francisco Caltrain Station"]
         return predicted_stops
 
-    def munge_single_train(self, df: pd.DataFrame) -> pd.DataFrame:
+    def assign_time_late(self, df: pd.DataFrame) -> pd.DataFrame:
         return df[["stop_name", "vehicle_id", "scheduled_departure", "expected_departure"]].assign(time_late=lambda df: df.expected_departure - df.scheduled_departure)
 
     def departures_response_to_next_trains_stopping_at_station(self, stop_id: str = None) -> None:
@@ -180,22 +217,25 @@ class RwcSfTrains:
         """
         # only if stopping at rwc and going <north|south>
         all_trains_one_direction = self.get_trains_one_direction_from_departures_response(stop_id)
-        station_departures = self.filter_predicted_stops_to_station(
+        station_departures = self.convert_predicted_stops_json_to_df(
             all_trains_one_direction,
             ID2NAME[stop_id],
         )
+        # Filter to trains stopping at station
+        station_departures_filtered = station_departures.loc[lambda df: df.stop_name == MAP_TO_AVAILABLE_STATION[ID2NAME[stop_id]]].copy()
+
         # return station_departures, all_trains_one_direction
-        station_departures = convert_time_str_to_local_tz_timestamp(
-            station_departures,
+        station_departures_filtered = convert_time_str_to_local_tz_timestamp(
+            station_departures_filtered,
             time_cols=MY_TRAIN_TIME_COLS if np.any(["_" in x for x in station_departures.columns]) else API_TRAIN_TIME_COLS,
         )
-        return self.munge_single_train(station_departures)
+        return self.assign_time_late(station_departures_filtered)
 
     def get_vehicle_onward_stops(self) -> pd.DataFrame:
         """
         Returns a df with cols ['stop_name', 'scheduled_arrival', 'expected_arrival', 'vehicle_id'] for all active trains
 
-        adjusts time by 6 minutes if ending is sf, because it doesn't return 4th & king data
+        adjusts time by 6 minutes if ending is sf, because it doesn't return San Francisco Caltrain Station data
         """
         #  list of all currently traveling caltrain vehicles
         vehicle_activity = self.real_time_response["Siri"]["ServiceDelivery"]["VehicleMonitoringDelivery"]["VehicleActivity"]
@@ -213,12 +253,11 @@ class RwcSfTrains:
         next_stops_for_rwc_stopping_trains = convert_time_str_to_local_tz_timestamp(next_stops_for_rwc_stopping_trains, ["AimedDepartureTime", "ExpectedDepartureTime"])
         munged = replace_colnames(next_stops_for_rwc_stopping_trains)
         if self.direction == "north":
-            print(munged.columns)
             return self.estimate_sf_stop_from_22nd_st_stop(munged)
         else:
             return munged
 
-    def estimate_sf_stop_from_22nd_st_stop(self, df: pd.DataFrame) -> pd.DataFrame:
+    def estimate_sf_stop_from_22nd_st_stop(self, df: pd.DataFrame, include_22nd=True) -> pd.DataFrame:
         """Must include columns scheduled_arrival and expected_arrival"""
         sign = 1 if self.direction == "north" else -1
         if "vehicle_id" not in df.columns:
@@ -226,17 +265,18 @@ class RwcSfTrains:
             cols_to_drop = ["vehicle_id"]
         else:
             cols_to_drop = []
+
         return (
             df.groupby("vehicle_id", group_keys=False)
             .apply(
                 lambda df: pd.concat(
                     [
-                        df,
+                        (df if include_22nd else pd.DataFrame([])),
                         df.loc[lambda df: df.stop_name == "22nd Street Caltrain Station", :]
-                        .replace("22nd Street Caltrain Station", "4th & King")
+                        .replace("22nd Street Caltrain Station", "San Francisco Caltrain Station")
                         .assign(
-                            **{k: lambda df: df[k] + (sign * pd.Timedelta("6 minutes")) for k in df.columns if re.search("scheduled|expected", k)},
-                            # expected_arrival':lambda df: df.expected_arrival + (sign * pd.Timedelta("6 minutes")),
+                            scheduled_departure=lambda df: df["scheduled_departure"] + (sign * pd.Timedelta("6 minutes")),
+                            expected_departure=lambda df: df["expected_departure"] + (sign * pd.Timedelta("6 minutes")),
                         ),
                     ],
                     axis=0,
@@ -245,10 +285,12 @@ class RwcSfTrains:
             .drop(columns=cols_to_drop)
         )
 
+        # **{k: lambda df: df[k] + ((sign * pd.Timedelta("6 minutes"))) for k in df.columns if re.search("scheduled|expected", k)},
+
 
 def convert_time_str_to_local_tz_timestamp(df: pd.DataFrame, time_cols: list[str]) -> pd.DataFrame:
     time_cols = [x for x in time_cols if x not in df.select_dtypes("datetime64[ns]").columns]
-    df[time_cols] = df[time_cols].applymap(iso_to_timestamp)
+    df.loc[:, time_cols] = df.loc[:, time_cols].applymap(iso_to_timestamp)
     return df
 
 
