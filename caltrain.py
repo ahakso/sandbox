@@ -10,6 +10,9 @@ import pandas as pd
 
 import requests
 from dateutil import parser, tz
+from simplegmail import Gmail
+
+GM = Gmail("/Users/ahakso/.alex_hakso_gsheets_credentials.json")
 
 API_TRAIN_TIME_COLS = [
     "AimedArrivalTime",
@@ -285,7 +288,16 @@ class RwcSfTrains:
             .drop(columns=cols_to_drop)
         )
 
-        # **{k: lambda df: df[k] + ((sign * pd.Timedelta("6 minutes"))) for k in df.columns if re.search("scheduled|expected", k)},
+    def send_next_options_to_inbox(self) -> None:
+        params = {
+            "to": "alex.hakso@gmail.com",
+            "sender": "alex.hakso@gmail.com",
+            "subject": "caltrain status",
+            "msg_html": self.next_train_options().to_html(index=False),
+            "msg_plain": str(self.next_train_options().data),
+            "signature": True,  # use my account signature
+        }
+        GM.send_message(**params)
 
 
 def convert_time_str_to_local_tz_timestamp(df: pd.DataFrame, time_cols: list[str]) -> pd.DataFrame:
@@ -332,3 +344,7 @@ def replace_colnames(df):
             "StopPointName": "stop_name",
         }
     )
+
+
+def delete_caltrain_emails():
+    [msg.trash() for msg in GM.get_messages(query="subject:(caltrain status)")]
