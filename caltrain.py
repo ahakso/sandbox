@@ -250,7 +250,7 @@ class RwcSfTrains:
 
         # concatenate a list of dfs describing coming stops for every train that stops in RWC
         next_stops_for_rwc_stopping_trains = pd.concat([one_vehicle_activity_to_stops_with_vehicle_id(one_vehicle_dict) for one_vehicle_dict in rwc_stopping_vehicle_activity])[
-            ["StopPointName", "AimedDepartureTime", "ExpectedDepartureTime", "vehicle_id"]
+            ["StopPointName", "AimedDepartureTime", "ExpectedDepartureTime", "vehicle_id", "line_type"]
         ]
 
         next_stops_for_rwc_stopping_trains = convert_time_str_to_local_tz_timestamp(next_stops_for_rwc_stopping_trains, ["AimedDepartureTime", "ExpectedDepartureTime"])
@@ -316,8 +316,9 @@ def iso_to_timestamp(isodt_str: str) -> pd.Timestamp:
 def one_vehicle_activity_to_stops_with_vehicle_id(one_vehicle_dict: dict) -> pd.DataFrame:
     """push vehicle id down into list of stop data dicts"""
     vehicle_id = one_vehicle_dict["MonitoredVehicleJourney"]["FramedVehicleJourneyRef"]["DatedVehicleJourneyRef"]
+    line_type = one_vehicle_dict["MonitoredVehicleJourney"]["PublishedLineName"]
     stop_data = one_vehicle_dict["MonitoredVehicleJourney"]["OnwardCalls"]["OnwardCall"]
-    return pd.DataFrame([stop | {"vehicle_id": vehicle_id} for stop in stop_data])
+    return pd.DataFrame([stop | {"vehicle_id": vehicle_id, "line_type": line_type} for stop in stop_data])
 
 
 def format_for_display(df):
