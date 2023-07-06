@@ -10,40 +10,18 @@ import pandas as pd
 
 import requests
 from dateutil import parser, tz
-from simplegmail import Gmail
 
-GM = Gmail("/Users/ahakso/.alex_hakso_gsheets_credentials.json")
-
-API_TRAIN_TIME_COLS = [
-    "AimedArrivalTime",
-    "ExpectedArrivalTime",
-    "AimedDepartureTime",
-    "ExpectedDepartureTime",
-]
-MY_TRAIN_TIME_COLS = [
-    "scheduled_arrival",
-    "expected_arrival",
-    "scheduled_departure",
-    "expected_departure",
-]
-
-CALTRAIN_OPERATOR_ID = "CT"
-RWC_CALTRAIN_STOP_ID = "redwood_city"
-TWENTY_SECOND_CALTRAIN_STOP_ID = "22nd_street"
-SF_CALTRAIN_STOP_ID = "san_francisco"
-
-ID2NAME = {
-    "san_francisco": "San Francisco Caltrain Station",
-    "22nd_street": "22nd Street Caltrain Station",
-    "redwood_city": "Redwood City Caltrain Station",
-}
-
-MAP_TO_AVAILABLE_STATION = {
-    "22nd Street Caltrain Station": "22nd Street Caltrain Station",
-    "San Francisco Caltrain Station": "22nd Street Caltrain Station",
-    "Redwood City Caltrain Station": "Redwood City Caltrain Station",
-    "San Francisco Caltrain Station": "San Francisco Caltrain Station",
-}
+from .constants import (
+    API_TRAIN_TIME_COLS,
+    CALTRAIN_OPERATOR_ID,
+    GM,
+    ID2NAME,
+    MAP_TO_AVAILABLE_STATION,
+    MY_TRAIN_TIME_COLS,
+    RWC_CALTRAIN_STOP_ID,
+    SF_CALTRAIN_STOP_ID,
+    TWENTY_SECOND_CALTRAIN_STOP_ID,
+)
 
 
 class RwcSfTrains:
@@ -89,14 +67,15 @@ class RwcSfTrains:
                 "scheduled_departure": "scheduled_arrival",
             }
         )
-        if self.my_destination_station_id == "san_francisco" and not len(arrival_df):
-            arrival_df = self.estimate_sf_stop_from_22nd_st_stop(self.departures_response_to_next_trains_stopping_at_station("22nd_street"), include_22nd=False).rename(
-                columns={
-                    "stop_name": "arrival_stop",
-                    "time_late": "late_arriving",
-                    "scheduled_departure": "scheduled_arrival",
-                }
-            )
+        if self.my_destination_station_id == "san_francisco":
+            while not len(arrival_df):
+                arrival_df = self.estimate_sf_stop_from_22nd_st_stop(self.departures_response_to_next_trains_stopping_at_station("22nd_street"), include_22nd=False).rename(
+                    columns={
+                        "stop_name": "arrival_stop",
+                        "time_late": "late_arriving",
+                        "scheduled_departure": "scheduled_arrival",
+                    }
+                )
 
         return (
             pd.merge(
