@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 import os
-import pdb
-import re
-from datetime import timezone
 
 import numpy as np
-import pandas as pd
 
+import pandas as pd
 import requests
-from dateutil import parser, tz
 
 from .constants import (
     API_TRAIN_TIME_COLS,
@@ -17,10 +13,18 @@ from .constants import (
     GM,
     ID2NAME,
     MAP_TO_AVAILABLE_STATION,
+    MINUTES_FROM_PRE_SF_STOP_NORTHWARD,
+    MINUTES_FROM_PRE_SF_STOP_SOUTHWARD,
     MY_TRAIN_TIME_COLS,
     RWC_CALTRAIN_STOP_ID,
     SF_CALTRAIN_STOP_ID,
     TWENTY_SECOND_CALTRAIN_STOP_ID,
+)
+from .util import (
+    convert_time_str_to_local_tz_timestamp,
+    format_for_display,
+    one_vehicle_activity_to_stops_with_vehicle_id,
+    replace_colnames,
 )
 
 
@@ -182,7 +186,7 @@ class RwcSfTrains:
             MY_TRAIN_TIME_COLS,
         )
         if stop_name == ("San Francisco Caltrain Station") and not predicted_stops.stop_name.str.contains("San Francisco Caltrain Station").any():
-            predicted_stops = self.estimate_sf_stop_from_22nd_st_stop(predicted_stops).loc[lambda df: df.stop_name == "San Francisco Caltrain Station"]
+            predicted_stops = self.estimate_sf_stop_from_last_north_stop(predicted_stops).loc[lambda df: df.stop_name == "San Francisco Caltrain Station"]
         return predicted_stops
 
     def assign_time_late(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -235,37 +239,64 @@ class RwcSfTrains:
         next_stops_for_rwc_stopping_trains = convert_time_str_to_local_tz_timestamp(next_stops_for_rwc_stopping_trains, ["AimedDepartureTime", "ExpectedDepartureTime"])
         munged = replace_colnames(next_stops_for_rwc_stopping_trains)
         if self.direction == "north":
-            return self.estimate_sf_stop_from_22nd_st_stop(munged)
+            return self.estimate_sf_stop_from_last_north_stop(munged)
         else:
             return munged
 
-    def estimate_sf_stop_from_22nd_st_stop(self, df: pd.DataFrame, include_22nd=True) -> pd.DataFrame:
-        """Must include columns scheduled_arrival and expected_arrival"""
-        sign = 1 if self.direction == "north" else -1
-        if "vehicle_id" not in df.columns:
-            df = df.assign(vehicle_id=1)
-            cols_to_drop = ["vehicle_id"]
-        else:
-            cols_to_drop = []
+    def estimate_sf_stop_from_last_north_stop(self, include_last_stop=True) -> pd.DataFrame:
+        return self.get_vehicle_onward_stops().groupby("vehicle_id").apply(self.estimate_sf_stop_from_last_north_stop_one_train)
 
-        return (
-            df.groupby("vehicle_id", group_keys=False)
-            .apply(
+    def estimate_sf_stop_from_last_north_stop_one_train(self, df: pd.DataFrame, include_last_stop=True) -> pd.DataFrame:
+        if (df.stop_name == "San Francisco Caltrain Station").any():
+            return df
+        else:
+            row_to_mutate = df.loc[
+                lambda df: df.scheduled_departure == df.scheduled_departure.agg("min" if (self.direction == "south") else "max"),
+                :,
+            ]
+            stop_time_map = MINUTES_FROM_PRE_SF_STOP_NORTHWARD if self.direction == "north" else MINUTES_FROM_PRE_SF_STOP_SOUTHWARD
+            last_stop_name = row_to_mutate.stop_name.iloc[0]
+            minutes_offset = stop_time_map[last_stop_name]
+            return df.pipe(
                 lambda df: pd.concat(
                     [
-                        (df if include_22nd else pd.DataFrame([])),
-                        df.loc[lambda df: df.stop_name == "22nd Street Caltrain Station", :]
-                        .replace("22nd Street Caltrain Station", "San Francisco Caltrain Station")
-                        .assign(
-                            scheduled_departure=lambda df: df["scheduled_departure"] + (sign * pd.Timedelta("6 minutes")),
-                            expected_departure=lambda df: df["expected_departure"] + (sign * pd.Timedelta("6 minutes")),
+                        (df if include_last_stop else pd.DataFrame([])),
+                        row_to_mutate.replace(last_stop_name, "San Francisco Caltrain Station",).assign(
+                            scheduled_departure=lambda df: df["scheduled_departure"] + (pd.Timedelta(f"{minutes_offset} minutes")),
+                            expected_departure=lambda df: df["expected_departure"] + (pd.Timedelta(f"{minutes_offset} minutes")),
                         ),
                     ],
                     axis=0,
                 )
-            )
-            .drop(columns=cols_to_drop)
-        )
+            ).sort_values("scheduled_departure")
+
+    # def estimate_sf_stop_from_22nd_st_stop(self, df: pd.DataFrame, include_22nd=True) -> pd.DataFrame:
+    #     """Must include columns scheduled_arrival and expected_arrival"""
+    #     sign = 1 if self.direction == "north" else -1
+    #     if "vehicle_id" not in df.columns:
+    #         df = df.assign(vehicle_id=1)
+    #         cols_to_drop = ["vehicle_id"]
+    #     else:
+    #         cols_to_drop = []
+
+    #     return (
+    #         df.groupby("vehicle_id", group_keys=False)
+    #         .apply(
+    #             lambda df: pd.concat(
+    #                 [
+    #                     (df if include_22nd else pd.DataFrame([])),
+    #                     df.loc[lambda df: df.stop_name == "22nd Street Caltrain Station", :]
+    #                     .replace("22nd Street Caltrain Station", "San Francisco Caltrain Station")
+    #                     .assign(
+    #                         scheduled_departure=lambda df: df["scheduled_departure"] + (sign * pd.Timedelta("6 minutes")),
+    #                         expected_departure=lambda df: df["expected_departure"] + (sign * pd.Timedelta("6 minutes")),
+    #                     ),
+    #                 ],
+    #                 axis=0,
+    #             )
+    #         )
+    #         .drop(columns=cols_to_drop)
+    #     )
 
     def send_next_options_to_inbox(self) -> None:
         params = {
@@ -277,54 +308,3 @@ class RwcSfTrains:
             "signature": True,  # use my account signature
         }
         GM.send_message(**params)
-
-
-def convert_time_str_to_local_tz_timestamp(df: pd.DataFrame, time_cols: list[str]) -> pd.DataFrame:
-    time_cols = [x for x in time_cols if x not in df.select_dtypes("datetime64[ns]").columns]
-    df.loc[:, time_cols] = df.loc[:, time_cols].applymap(iso_to_timestamp)
-    return df
-
-
-def iso_to_timestamp(isodt_str: str) -> pd.Timestamp:
-    if not isinstance(isodt_str, str):
-        return isodt_str
-    isodt = parser.parse(isodt_str)
-    return pd.Timestamp(isodt.replace(tzinfo=timezone.utc).astimezone(tz=tz.gettz("America/Los_Angeles"))).tz_convert(tz=tz.gettz("America/Los_Angeles"))
-
-
-def one_vehicle_activity_to_stops_with_vehicle_id(one_vehicle_dict: dict) -> pd.DataFrame:
-    """push vehicle id down into list of stop data dicts"""
-    vehicle_id = one_vehicle_dict["MonitoredVehicleJourney"]["FramedVehicleJourneyRef"]["DatedVehicleJourneyRef"]
-    line_type = one_vehicle_dict["MonitoredVehicleJourney"]["PublishedLineName"]
-    stop_data = one_vehicle_dict["MonitoredVehicleJourney"]["OnwardCalls"]["OnwardCall"]
-    return pd.DataFrame([stop | {"vehicle_id": vehicle_id, "line_type": line_type} for stop in stop_data])
-
-
-def format_for_display(df):
-    def time_delta_to_minutes(x: pd.Timedelta) -> callable:
-        return f"{(x.seconds/60):.0f} minutes" if x.days == 0 else f"-{((-x).seconds/60):.0f} minutes"
-
-    return df.rename(columns={k: k.replace("_", " ") for k in df.columns}).pipe(
-        lambda df: df.style.format(
-            {k: lambda x: x.strftime("%H:%M") if not pd.isna(x) else "-" for k in df.columns if "scheduled" in k or "expected" in k}
-            | {"minutes late": "{:0.1f}"}
-            | {k: time_delta_to_minutes for k in df.columns if (re.search("duration|travel|late", k))}
-        )
-    )
-
-
-def replace_colnames(df):
-    return df.rename(
-        columns={
-            "AimedDepartureTime": "scheduled_departure",
-            "ExpectedDepartureTime": "expected_departure",
-            "AimedArrivalTime": "scheduled_arrival",
-            "ExpectedArrivalTime": "expected_arrival",
-            "VehicleRef": "vehicle_id",
-            "StopPointName": "stop_name",
-        }
-    )
-
-
-def delete_caltrain_emails():
-    [msg.trash() for msg in GM.get_messages(query="subject:(caltrain status)")]

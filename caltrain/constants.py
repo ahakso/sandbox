@@ -32,3 +32,14 @@ MAP_TO_AVAILABLE_STATION = {
     "Redwood City Caltrain Station": "Redwood City Caltrain Station",
     "San Francisco Caltrain Station": "San Francisco Caltrain Station",
 }
+
+MINUTES_FROM_PRE_SF_STOP_NORTHWARD = {
+    "22nd Street Caltrain Station": 6,
+    "South San Francisco Caltrain Station": 13,
+    "Millbrae Caltrain Station": 19,
+}
+MINUTES_FROM_PRE_SF_STOP_SOUTHWARD = {
+    "22nd Street Caltrain Station": -5,
+    "South San Francisco Caltrain Station": -13,
+    "Millbrae Caltrain Station": -18,
+}
