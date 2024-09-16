@@ -203,6 +203,7 @@ class RwcSfTrains:
         """
         # only if stopping at rwc and going <north|south>
         all_trains_one_direction = self.get_trains_one_direction_from_departures_response(stop_id)
+        return all_trains_one_direction
         station_departures = self.convert_predicted_stops_json_to_df(
             all_trains_one_direction,
             ID2NAME[stop_id],
