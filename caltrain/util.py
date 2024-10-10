@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pdb
 import re
 from datetime import timezone
 
@@ -8,7 +7,7 @@ import pandas as pd
 
 from dateutil import parser, tz
 
-from .constants import GM
+from constants import GM
 
 
 def convert_time_str_to_local_tz_timestamp(df: pd.DataFrame, time_cols: list[str]) -> pd.DataFrame:
@@ -21,7 +20,9 @@ def iso_to_timestamp(isodt_str: str) -> pd.Timestamp:
     if not isinstance(isodt_str, str):
         return isodt_str
     isodt = parser.parse(isodt_str)
-    return pd.Timestamp(isodt.replace(tzinfo=timezone.utc).astimezone(tz=tz.gettz("America/Los_Angeles"))).tz_convert(tz=tz.gettz("America/Los_Angeles"))
+    return pd.Timestamp(isodt.replace(tzinfo=timezone.utc).astimezone(tz=tz.gettz("America/Los_Angeles"))).tz_convert(
+        tz=tz.gettz("America/Los_Angeles")
+    )
 
 
 def one_vehicle_activity_to_stops_with_vehicle_id(one_vehicle_dict: dict) -> pd.DataFrame:
@@ -38,7 +39,11 @@ def format_for_display(df):
 
     return df.rename(columns={k: k.replace("_", " ") for k in df.columns}).pipe(
         lambda df: df.style.format(
-            {k: lambda x: x.strftime("%H:%M") if not pd.isna(x) else "-" for k in df.columns if "scheduled" in k or "expected" in k}
+            {
+                k: lambda x: x.strftime("%H:%M") if not pd.isna(x) else "-"
+                for k in df.columns
+                if "scheduled" in k or "expected" in k
+            }
             | {"minutes late": "{:0.1f}"}
             | {k: time_delta_to_minutes for k in df.columns if (re.search("duration|travel|late", k))}
         )

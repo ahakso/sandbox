@@ -38,8 +38,29 @@ MINUTES_FROM_PRE_SF_STOP_NORTHWARD = {
     "South San Francisco Caltrain Station": 13,
     "Millbrae Caltrain Station": 19,
 }
+MINUTES_FROM_PRE_SF_STOP_NORTHWARD = MINUTES_FROM_PRE_SF_STOP_NORTHWARD | {
+    k + " Northbound": v for k, v in MINUTES_FROM_PRE_SF_STOP_NORTHWARD.items()
+}
 MINUTES_FROM_PRE_SF_STOP_SOUTHWARD = {
     "22nd Street Caltrain Station": -5,
     "South San Francisco Caltrain Station": -13,
     "Millbrae Caltrain Station": -18,
+}
+
+DESTINATION_NAMES = {
+    "south": set.union(
+        *[
+            {x, x + " Southbound"}
+            for x in [
+                "Gilroy",
+                "San Jose Diridon",
+                "Tamien Caltrain Station",
+                "Tamien",
+                "San Jose Diridon Caltrain Station",
+                "Tamien Caltrain Station",
+            ]
+        ]
+    ),
+    "north": set.union(*[{x, x + " Northbound"} for x in ["San Francisco Caltrain Station", "San Francisco"]]),
+    # these have been renamed, but things are in the air. appending new names, but may want to clear later
 }
