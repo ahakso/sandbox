@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import requests
 
-# from labtools.util.ipython import copy_environment_to_ipython
+from labtools.util.ipython import copy_environment_to_ipython
 
 from constants import (
     API_TRAIN_TIME_COLS,
@@ -75,7 +75,7 @@ class RwcSfTrains:
         """
         while not len(arrival_df):
             arrival_df = self.estimate_sf_stop_from_last_north_stop(
-                self.departures_response_to_next_trains_stopping_at_station("22nd_street")
+                self.departures_response_to_next_trains_stopping_at_station("22nd_street"), include_last_stop=False
             ).rename(
                 columns={
                     "stop_name": "arrival_stop",
@@ -388,14 +388,13 @@ class RwcSfTrains:
         else:
             return munged
 
-    def estimate_sf_stop_from_last_north_stop(self, include_last_stop=True) -> pd.DataFrame:
-        return (
-            self.get_vehicle_onward_stops()
-            .groupby("vehicle_id")
-            .apply(self.estimate_sf_stop_from_last_north_stop_one_train)
+    def estimate_sf_stop_from_last_north_stop(self, df: pd.DataFrame, include_last_stop: bool = True) -> pd.DataFrame:
+        return df.groupby("vehicle_id", as_index=False).apply(
+            self.estimate_sf_stop_from_last_north_stop_one_train, include_last_stop
         )
 
     def estimate_sf_stop_from_last_north_stop_one_train(self, df: pd.DataFrame, include_last_stop=True) -> pd.DataFrame:
+
         if (df.stop_name == "San Francisco Caltrain Station").any():
             return df
         else:
@@ -409,23 +408,27 @@ class RwcSfTrains:
             )
             last_stop_name = row_to_mutate.stop_name.values[0]
             minutes_offset = stop_time_map[last_stop_name]
-            return df.pipe(
-                lambda df: pd.concat(
-                    [
-                        (df if include_last_stop else pd.DataFrame([])),
-                        row_to_mutate.replace(
-                            last_stop_name,
-                            "San Francisco Caltrain Station",
-                        ).assign(
-                            scheduled_departure=lambda df: df["scheduled_departure"]
-                            + (pd.Timedelta(f"{minutes_offset} minutes")),
-                            expected_departure=lambda df: df["expected_departure"]
-                            + (pd.Timedelta(f"{minutes_offset} minutes")),
-                        ),
-                    ],
-                    axis=0,
+            return (
+                df.pipe(
+                    lambda df: pd.concat(
+                        [
+                            (df if include_last_stop else pd.DataFrame([])),
+                            row_to_mutate.replace(
+                                last_stop_name,
+                                "San Francisco Caltrain Station",
+                            ).assign(
+                                scheduled_departure=lambda df: df["scheduled_departure"]
+                                + (pd.Timedelta(f"{minutes_offset} minutes")),
+                                expected_departure=lambda df: df["expected_departure"]
+                                + (pd.Timedelta(f"{minutes_offset} minutes")),
+                            ),
+                        ],
+                        axis=0,
+                    )
                 )
-            ).sort_values("scheduled_departure")
+                .sort_values("scheduled_departure")
+                .loc[lambda df: (df["arrival_stop"] == "San Francisco Caltrain Station") | include_last_stop, :]
+            )
 
     # def estimate_sf_stop_from_22nd_st_stop(self, df: pd.DataFrame, include_22nd=True) -> pd.DataFrame:
     #     """Must include columns scheduled_arrival and expected_arrival"""
