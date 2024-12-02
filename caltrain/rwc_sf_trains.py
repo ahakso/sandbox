@@ -329,7 +329,6 @@ class RwcSfTrains:
             )
         ].copy()
 
-        # return station_departures, all_trains_one_direction
         station_departures_filtered = convert_time_str_to_local_tz_timestamp(
             station_departures_filtered,
             time_cols=(
@@ -429,34 +428,6 @@ class RwcSfTrains:
                 .sort_values("scheduled_departure")
                 .loc[lambda df: (df["arrival_stop"] == "San Francisco Caltrain Station") | include_last_stop, :]
             )
-
-    # def estimate_sf_stop_from_22nd_st_stop(self, df: pd.DataFrame, include_22nd=True) -> pd.DataFrame:
-    #     """Must include columns scheduled_arrival and expected_arrival"""
-    #     sign = 1 if self.direction == "north" else -1
-    #     if "vehicle_id" not in df.columns:
-    #         df = df.assign(vehicle_id=1)
-    #         cols_to_drop = ["vehicle_id"]
-    #     else:
-    #         cols_to_drop = []
-
-    #     return (
-    #         df.groupby("vehicle_id", group_keys=False)
-    #         .apply(
-    #             lambda df: pd.concat(
-    #                 [
-    #                     (df if include_22nd else pd.DataFrame([])),
-    #                     df.loc[lambda df: df.stop_name == "22nd Street Caltrain Station", :]
-    #                     .replace("22nd Street Caltrain Station", "San Francisco Caltrain Station")
-    #                     .assign(
-    #                         scheduled_departure=lambda df: df["scheduled_departure"] + (sign * pd.Timedelta("6 minutes")),
-    #                         expected_departure=lambda df: df["expected_departure"] + (sign * pd.Timedelta("6 minutes")),
-    #                     ),
-    #                 ],
-    #                 axis=0,
-    #             )
-    #         )
-    #         .drop(columns=cols_to_drop)
-    #     )
 
     def send_next_options_to_inbox(self) -> None:
         params = {
