@@ -1,3 +1,6 @@
+# Meta Notes
+a bunch of game logic was moved into the two different UIs. Sonnet 3.7 did a decent job on the refactor
+
 # Texas Hold'em Poker Game
 
 A simple Texas Hold'em poker game where you can play against two bots.
