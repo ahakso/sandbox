@@ -1,0 +1,157 @@
+Dealer button moved to Player Alice
+
+--- Starting Betting Round  ---
+Pot: 40, Current Bet to Match: 0
+Initial player to act: Bob
+
+Action on Bob (Chips: 980, Round Bet: 0)
+Pot: 40, To Call: 0
+MOCK_ACTION: Player Bob (chips 980, current round bet 0, needs to call 0 to meet 0) -> Test provides: check to total street bet of 0
+Bob checks.
+
+Action on Charlie (Chips: 980, Round Bet: 0)
+Pot: 40, To Call: 0
+MOCK_ACTION: Player Charlie (chips 980, current round bet 0, needs to call 0 to meet 0) -> Test provides: bet to total street bet of 50
+Added 50 to pot. Pot is now 90
+Charlie bets 50.
+
+Action on Bob (Chips: 980, Round Bet: 0)
+Pot: 90, To Call: 50
+MOCK_ACTION: Player Bob (chips 980, current round bet 0, needs to call 50 to meet 50) -> Test provides: call to total street bet of 50
+Added 50 to pot. Pot is now 140
+Bob calls 50.
+Betting round ends: All players acted in sequence and bets settled.
+--- Betting Round Ended ---
+Final Pot: 140
+  Alice: Folded
+  Bob: Chips 930, Round Bet 50
+  Charlie: Chips 930, Round Bet 50
+Dealer button moved to Player Alice
+Bob posts small blind (10)
+Added 10 to pot. Pot is now 10
+Charlie posts big blind (20)
+Added 20 to pot. Pot is now 30
+Action starts with Alice
+
+--- Starting Betting Round (Pre-flop) ---
+Pot: 30, Current Bet to Match: 20
+Initial player to act: Alice
+
+Action on Alice (Chips: 1000, Round Bet: 0)
+Pot: 30, To Call: 20
+MOCK_ACTION: Player Alice (chips 1000, current round bet 0, needs to call 20 to meet 20) -> Test provides: fold to total street bet of 0
+Alice folds.
+
+Action on Bob (Chips: 990, Round Bet: 10)
+Pot: 30, To Call: 10
+MOCK_ACTION: Player Bob (chips 990, current round bet 10, needs to call 10 to meet 20) -> Test provides: fold to total street bet of 10
+Bob folds.
+Betting round ends: One or no players left.
+--- Betting Round Ended ---
+Final Pot: 30
+  Alice: Folded
+  Bob: Folded
+  Charlie: Chips 980, Round Bet 20
+Dealer button moved to Player Alice
+Bob posts small blind (10)
+Added 10 to pot. Pot is now 10
+Charlie posts big blind (20)
+Added 20 to pot. Pot is now 30
+Action starts with Alice
+
+--- Starting Betting Round (Pre-flop) ---
+Pot: 30, Current Bet to Match: 20
+Initial player to act: Alice
+
+Action on Alice (Chips: 1000, Round Bet: 0)
+Pot: 30, To Call: 20
+MOCK_ACTION: Player Alice (chips 1000, current round bet 0, needs to call 20 to meet 20) -> Test provides: fold to total street bet of 0
+Alice folds.
+
+Action on Bob (Chips: 990, Round Bet: 10)
+Pot: 30, To Call: 10
+MOCK_ACTION: Player Bob (chips 990, current round bet 10, needs to call 10 to meet 20) -> Test provides: call to total street bet of 20
+Added 10 to pot. Pot is now 40
+Bob calls 10.
+
+Action on Charlie (Chips: 980, Round Bet: 20)
+Pot: 40, To Call: 0
+MOCK_ACTION: Player Charlie (chips 980, current round bet 20, needs to call 0 to meet 20) -> Test provides: check to total street bet of 20
+Charlie checks.
+BB (Charlie) had option and checked/called. Round ends.
+--- Betting Round Ended ---
+Final Pot: 40
+  Alice: Folded
+  Bob: Chips 980, Round Bet 20
+  Charlie: Chips 980, Round Bet 20
+Dealer button moved to Player Alice
+Bob posts small blind (10)
+Added 10 to pot. Pot is now 10
+Charlie posts big blind (20)
+Added 20 to pot. Pot is now 30
+Action starts with Alice
+
+--- Starting Betting Round (Pre-flop) ---
+Pot: 30, Current Bet to Match: 20
+Initial player to act: Alice
+
+Action on Alice (Chips: 1000, Round Bet: 0)
+Pot: 30, To Call: 20
+MOCK_ACTION: Player Alice (chips 1000, current round bet 0, needs to call 20 to meet 20) -> Test provides: bet to total street bet of 60
+Added 60 to pot. Pot is now 90
+Alice raises to 60.
+
+Action on Bob (Chips: 990, Round Bet: 10)
+Pot: 90, To Call: 50
+MOCK_ACTION: Player Bob (chips 990, current round bet 10, needs to call 50 to meet 60) -> Test provides: fold to total street bet of 10
+Bob folds.
+
+Action on Charlie (Chips: 980, Round Bet: 20)
+Pot: 90, To Call: 40
+MOCK_ACTION: Player Charlie (chips 980, current round bet 20, needs to call 40 to meet 60) -> Test provides: fold to total street bet of 20
+Charlie folds.
+Betting round ends: All players acted in sequence and bets settled.
+--- Betting Round Ended ---
+Final Pot: 90
+  Alice: Chips 940, Round Bet 60
+  Bob: Folded
+  Charlie: Folded
+Burned card: A of Spades
+Flop dealt: ['K of Spades', 'Q of Spades', 'J of Spades']
+Current community cards: ['K of Spades', 'Q of Spades', 'J of Spades']
+Not enough cards in deck to deal flop.
+Burned card: A of Spades
+Flop dealt: ['K of Spades', 'Q of Spades', 'J of Spades']
+Current community cards: ['K of Spades', 'Q of Spades', 'J of Spades']
+Burned card: T of Spades
+Turn dealt: 9 of Spades
+Current community cards: ['K of Spades', 'Q of Spades', 'J of Spades', '9 of Spades']
+Burned card: 8 of Spades
+River dealt: 7 of Spades
+Current community cards: ['K of Spades', 'Q of Spades', 'J of Spades', '9 of Spades', '7 of Spades']
+Burned card: A of Spades
+Flop dealt: ['K of Spades', 'Q of Spades', 'J of Spades']
+Current community cards: ['K of Spades', 'Q of Spades', 'J of Spades']
+Burned card: T of Spades
+Turn dealt: 9 of Spades
+Current community cards: ['K of Spades', 'Q of Spades', 'J of Spades', '9 of Spades']
+Not enough cards in deck to deal river.
+Burned card: A of Spades
+Flop dealt: ['K of Spades', 'Q of Spades', 'J of Spades']
+Current community cards: ['K of Spades', 'Q of Spades', 'J of Spades']
+Burned card: T of Spades
+Turn dealt: 9 of Spades
+Current community cards: ['K of Spades', 'Q of Spades', 'J of Spades', '9 of Spades']
+Burned card: 8 of Spades
+River dealt: 7 of Spades
+Current community cards: ['K of Spades', 'Q of Spades', 'J of Spades', '9 of Spades', '7 of Spades']
+Burned card: A of Spades
+Flop dealt: ['K of Spades', 'Q of Spades', 'J of Spades']
+Current community cards: ['K of Spades', 'Q of Spades', 'J of Spades']
+Burned card: T of Spades
+Turn dealt: 9 of Spades
+Current community cards: ['K of Spades', 'Q of Spades', 'J of Spades', '9 of Spades']
+Burned card: A of Spades
+Flop dealt: ['K of Spades', 'Q of Spades', 'J of Spades']
+Current community cards: ['K of Spades', 'Q of Spades', 'J of Spades']
+Not enough cards in deck to deal turn.
